@@ -8,9 +8,7 @@ from keras.layers import LSTM
 from keras.layers import Dropout
 import config
 from feature_encoder import FeatureEncoder
-from LSTM_model import net
 import time
-from utils.processor import LogsDataProcessor
 from utils.Writing_methods import write_results_to_text, evaluate_each_prefix, evaluate
 import pandas as pd
 
@@ -57,14 +55,12 @@ if not os.path.exists(f"{args.data_dir}/{args.dataset}"):
     os.makedirs(f"{args.data_dir}/{args.dataset}")
 output_datasets_address = f"{args.data_dir}/{args.dataset}"
 
-# model_name = '%s-%s_%s' % (
-#     args.dataset, args.num_epochs, args.batch_size)
-# output_file = output_address + args.dataset + "%s.log" % args.LPMs_type
-
 with open(output_datasets_address + '/coded_activity.pkl', 'rb') as handle:
     coded_activity = pickle.load(handle)
 with open(output_datasets_address + '/coded_labels.pkl', 'rb') as handle:
     coded_labels = pickle.load(handle)
+with open(output_datasets_address + '/coded_lpms.pkl', 'rb') as handle:
+    coded_lpms = pickle.load(handle)
 with open(output_datasets_address + '/Max_prefix_length.pkl', 'rb') as handle:
     Max_prefix_length = pickle.load(handle)
 
@@ -72,9 +68,14 @@ Train_path = output_datasets_address + "/outcome_train.csv"
 train_df = pd.read_csv(filepath_or_buffer=Train_path, header=0, sep=',')
 print("Encoding training features ...")
 fe = FeatureEncoder()
-train_X, train_y = fe.one_hot_encoding(train_df, coded_activity, coded_labels, Max_prefix_length,
-                                       features=args.features, LPMs=args.LPMs,
-                                       Lpms_type=args.LPMs_type, Normalize=args.LPMs_Normal)
+if args.encoding_type == 'W':
+    train_X, train_y = fe.one_hot_encoding_Wrapped(train_df, coded_activity, coded_labels, Max_prefix_length,
+                                                   Lpms_type=args.LPMs_type)
+elif args.encoding_type == 'C':
+    train_X, train_y = fe.one_hot_encoding_Classic(train_df, coded_activity, coded_labels, coded_lpms,
+                                                   Max_prefix_length, LPMs=args.LPMs)
+else:
+    print("encoding type: %s is not supported! choose between C and W " % args.encoding_type)
 
 print("done")
 
@@ -94,23 +95,36 @@ model.fit(train_X, train_y, batch_size=params['batch_size'], epochs=args.num_epo
 
 Running_Time = time.time() - start_time
 
-model.save(output_datasets_address + "/model_lpm%s_%s" % (args.LPMs, args.LPMs_type))
+model.save(output_datasets_address + "/model_Encoding%s_LPMs%s_%s" % (args.encoding_type,
+                                                                      args.LPMs,
+                                                                      args.LPMs_type))
 print('LSTM training time is %.3f S' % Running_Time)
 
 print("Encoding test features...")
 Test_path = output_datasets_address + "/outcome_test.csv"
 test_df = pd.read_csv(filepath_or_buffer=Test_path, header=0, sep=',')
-fe_test = FeatureEncoder()
-test_X, test_y = fe_test.one_hot_encoding(test_df, coded_activity, coded_labels, Max_prefix_length,
-                                          features=args.features, LPMs=args.LPMs,
-                                          Lpms_type=args.LPMs_type, Normalize=args.LPMs_Normal)
+if args.encoding_type == 'W':
+    test_X, test_y = fe.one_hot_encoding_Wrapped(test_df, coded_activity, coded_labels, Max_prefix_length,
+                                                 Lpms_type=args.LPMs_type)
+elif args.encoding_type == 'C':
+    test_X, test_y = fe.one_hot_encoding_Classic(test_df, coded_activity, coded_labels, coded_lpms,
+                                                 Max_prefix_length, LPMs=args.LPMs)
+else:
+    print("encoding type: %s is not supported! choose between C and W " % args.encoding_type)
+
 print("done")
 
 # model.load(args.checkpoint_dir, model_name=model_name)
 print("Evaluating ...")
 CF_matrix, report, Accuracy, F1_Score, Precision, Recall, Cohen_kappa, auc = evaluate(model, test_X, test_y)
-results_file = output_address + "Results_ConfMat_LSTM_%s.txt" % args.LPMs_type
+results_file = output_address + "Results_ConfMat_LSTM_Encoding%s_LPMs%s_%s.txt" % (args.encoding_type,
+                                                                                   args.LPMs,
+                                                                                   args.LPMs_type)
 test_prefixes = test_df["k"]
-write_results_to_text(CF_matrix, report, Accuracy, F1_Score, Precision, Recall, Running_Time, Cohen_kappa, auc, results_file)
-evaluate_each_prefix(model, test_X, test_y, test_prefixes, output_address, "results_prefixes_LSTM_%s" % args.LPMs_type)
+write_results_to_text(CF_matrix, report, Accuracy, F1_Score, Precision, Recall, Running_Time, Cohen_kappa, auc,
+                      results_file)
+evaluate_each_prefix(model, test_X, test_y, test_prefixes, output_address,
+                     "results_prefixes_LSTM_Encoding%s_LPMs%s_%s" % (args.encoding_type,
+                                                                     args.LPMs,
+                                                                     args.LPMs_type))
 print("done")

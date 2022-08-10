@@ -613,8 +613,8 @@ def distance(out, net, im, aligned_traces):
 
 # In[22]:
 
-folder_address = "../../Datasets/000_Experimemts/BPIC2012/declined/"
-LPMs_file = glob.glob(folder_address + "LPM_D0.8/*.pnml")
+folder_address = "../../../../Datasets/IKNL/dataset_K21.242/All_Episodes/"
+LPMs_file = glob.glob(folder_address + "LPMs_all/*.pnml")
 
 Unique_acts = set()
 behaviour_per_acts = dict()

@@ -2,6 +2,7 @@ import glob
 import time
 import numpy as np
 import os
+import argparse
 import pm4py
 from pm4py.objects.log.importer.xes import importer as xes_importer
 from pm4py.objects.petri_net.importer import importer as pnml_import
@@ -16,10 +17,26 @@ from pm4py.objects.petri_net.exporter import exporter as pnml_exporter
 from pm4py.algo.conformance.alignments.petri_net.algorithm import Parameters
 from pm4py.algo.filtering.log.attributes import attributes_filter
 import pandas as pd
-from utils import DatasetManager
 
 
-# parameters = {Parameters.PARAM_ALIGNMENT_RESULT_IS_SYNC_PROD_AWARE: True}
+def generate_prefix_data(org_data, min_length, max_length):
+    # generate prefix data (each possible prefix becomes a trace)
+    case_id_col = "case:concept:name"
+    activity_col = "concept:name"
+    data = org_data.copy()
+    data['case_length'] = data.groupby(case_id_col)[activity_col].transform(len)
+    data['base_case_id'] = data[case_id_col]
+    dt_prefixes = data[data['case_length'] >= min_length].groupby(case_id_col).head(min_length)
+    for nr_events in range(min_length + 1, max_length + 1):
+        print(nr_events)
+        tmp = data[data['case_length'] >= nr_events].groupby(case_id_col).head(nr_events)
+        tmp[case_id_col] = tmp[case_id_col].apply(lambda x: "%s_%s" % (x, nr_events))
+        dt_prefixes = pd.concat([dt_prefixes, tmp], axis=0)
+
+    dt_prefixes['case_length'] = dt_prefixes.groupby(case_id_col)[activity_col].transform(len)
+    dt_prefixes = dt_prefixes.reset_index(drop=True)
+
+    return dt_prefixes
 
 
 def custom_alignment(net, im, fm, log):
@@ -95,130 +112,150 @@ def wrap_lpm(net, im, fm):
     return net, im, final_marking
 
 
-####### start here ###########
+parser = argparse.ArgumentParser(description="LPM Alignment Checking")
+parser.add_argument("--dataset",
+                    type=str,
+                    default="production_LPMs_HPopt",
+                    help="dataset name")
 
-# import log once
-folder_address = "../../Datasets/000_Experimemts/BPIC2011/f1/"
-Original_log = xes_importer.apply(folder_address + 'BPIC11_f1_Trunc36.xes')
-Original_dataframe = log_converter.apply(Original_log, variant=log_converter.Variants.TO_DATA_FRAME)
+parser.add_argument("--LPMs_dir",
+                    type=str,
+                    default="./lpm_folder",
+                    help="path to lpms (.pnml format)")
 
-# Original_dataframe['event_nr'] = ""
-# idx = 0
-# for case in Original_dataframe['case:concept:name'].unique():
-#     case_length = len(Original_dataframe[Original_dataframe['case:concept:name']==case])
-#     for i in range(1, case_length+1):
-#         Original_dataframe.at[idx, 'event_nr'] = i
-#         idx += 1
+parser.add_argument("--raw_log_file",
+                    type=str,
+                    default="./datasets/Production_Trunc23_completeLPMs_Aggregated.csv",
+                    help="path to raw xes format log file")
 
-Original_dataframe['Case_duplicate'] = Original_dataframe['case:concept:name']
-start = time.time()
-case_id = "case:concept:name"
-event_nr_col = "event_nr"
-manager = DatasetManager('production')
-# generating prefixes traces
-Prefixes_dataframe = manager.generate_prefix_data(Original_dataframe, 2, 36)
-Prefixes_log = log_converter.apply(Prefixes_dataframe, variant=log_converter.Variants.TO_EVENT_LOG)
-# for each LPM [note: this is a prototype, I'm doing it for one]:
-LPMs_file = glob.glob(folder_address + "Discriminative/Non_Similar_LPMs/*.pnml")
-model_move_counter = set()
-for net_file in LPMs_file:
-    lpm_number = os.path.basename(net_file).split(".")[0].split("_")[1]
-    # lpm_number = os.path.basename(net_file).split(".")[0]
-    lpm_col = "LPM_%s" % lpm_number
-    print(lpm_number)
-    # net_file = "C:/Users/20211286/Documents/PhD/Datasets/BPIC2012/bpic2012_O_Accepted/LPMs/20.apnml"
-    t_names = list()
-    lpm_acts = list()
-    net, im, fm = pnml_import.apply(net_file)
+parser.add_argument("--processed_log_file",
+                    type=str,
+                    default="./datasets/Production_Trunc23_completeLPMs_Aggregated.csv",
+                    help="path to location store and name of the output file in csv format")
 
-    for t in net.transitions:
-        t_names.append(t)
-        if t.label != None:
-            lpm_acts.append(t.label)
+parser.add_argument('--Min_prefix_size', default=2, type=float)
+parser.add_argument('--Max_prefix_size', default=36, type=float)
 
-    number_act_lpm = len(lpm_acts)
-    if number_act_lpm > 2:
-        print(number_act_lpm)
-    lpm_acts.sort()
-    # gviz = pn_visualizer.apply(net, im, fm)
-    # pn_visualizer.view(gviz)
-    # build a new event log where for each trace only events corresponding to LPMs models are kept.
-    print('start filtering data')
-    tracefilter_log_pos = attributes_filter.apply_events(Prefixes_log, [transition.label for transition in t_names if
-                                                                        not transition.label is None],
-                                                         parameters={
-                                                             attributes_filter.Parameters.ATTRIBUTE_KEY: 'concept:name',
-                                                             attributes_filter.Parameters.POSITIVE: True})
+args = parser.parse_args()
 
-    # we keep all the cases which have a number of activities greater than or equal to the number of activities in LPM
-    filtered_log = pm4py.filter_log(lambda x: len(x) >= number_act_lpm, tracefilter_log_pos)
-    # remove cases with duplicate activities, we need to keep cases which has a unique number of activities greater
-    # than activities in LPM
+if __name__ == '__main__':
+    Min_prefix_size = args.Min_prefix_size
+    Max_prefix_size = args.Max_prefix_size
+    event_log_address = args.raw_log_file
+    output_address_name_file = args.processed_log_file
+    LPMs_folder_name = args.LPMs_dir
 
-    for x in filtered_log:
-        uniques_events = []
-        for ev in x:
-            uniques_events.append(ev._dict['concept:name'])
-        if len(np.unique(uniques_events)) < number_act_lpm:
-            target_case = x[0]._dict['Case_duplicate']
-            filtered_log = attributes_filter.apply(filtered_log, [target_case],
-                                                   parameters={
-                                                       attributes_filter.Parameters.ATTRIBUTE_KEY: "Case_duplicate",
-                                                       attributes_filter.Parameters.POSITIVE: False})
+    # import log once in xes format
+    Original_log = xes_importer.apply(event_log_address)
+    Original_dataframe = log_converter.apply(Original_log, variant=log_converter.Variants.TO_DATA_FRAME)
 
-    # aligned_traces = custom_alignment(net_2, im_2, fm_2, tracefilter_log_pos)  # generate the aligned traces;
-    print('start creating alignment checking')
-    aligned_traces = custom_alignment(net, im, fm, filtered_log)
-    Final_log = []
-    print('start creating lpm feature')
-    print(len(aligned_traces))
-    for ii, aligned_trace in enumerate(aligned_traces):
-        # print(ii)
-        Case = log_converter.apply(filtered_log[ii], variant=log_converter.Variants.TO_DATA_FRAME)
-        Case[case_id] = filtered_log[ii].attributes['concept:name']
-        Case[lpm_col] = np.False_
-        aligned_acts = set()
-        for jj, el in enumerate(aligned_trace["alignment"]):
-            if ">>" in el[1]:
-                continue
-            else:
-                aligned_acts.add(el[1][0])
+    Original_dataframe['Case_duplicate'] = Original_dataframe['case:concept:name']
+    start = time.time()
 
-        idx_counter = 0
-        if len(aligned_acts) >= number_act_lpm:
+    case_id = "case:concept:name"
+    event_nr_col = "event_nr"
+
+    # generating prefixes traces
+    Prefixes_dataframe = generate_prefix_data(Original_dataframe, Min_prefix_size, Max_prefix_size)
+    Prefixes_log = log_converter.apply(Prefixes_dataframe, variant=log_converter.Variants.TO_EVENT_LOG)
+    LPMs_file = glob.glob(LPMs_folder_name + "/*.pnml")
+    model_move_counter = set()
+    for net_file in LPMs_file:
+        lpm_number = os.path.basename(net_file).split(".")[0].split("_")[1]
+        # lpm_number = os.path.basename(net_file).split(".")[0]
+        lpm_col = "LPM_%s" % lpm_number
+        print(lpm_number)
+        t_names = list()
+        lpm_acts = list()
+        net, im, fm = pnml_import.apply(net_file)
+
+        for t in net.transitions:
+            t_names.append(t)
+            if t.label != None:
+                lpm_acts.append(t.label)
+
+        number_act_lpm = len(lpm_acts)
+        if number_act_lpm > 2:
+            print(number_act_lpm)
+        lpm_acts.sort()
+        # gviz = pn_visualizer.apply(net, im, fm)
+        # pn_visualizer.view(gviz)
+        # build a new event log where for each trace only events corresponding to LPMs models are kept.
+        print('start filtering data')
+        tracefilter_log_pos = attributes_filter.apply_events(Prefixes_log, [transition.label for transition in t_names if
+                                                                            not transition.label is None],
+                                                             parameters={
+                                                                 attributes_filter.Parameters.ATTRIBUTE_KEY: 'concept:name',
+                                                                 attributes_filter.Parameters.POSITIVE: True})
+
+        # we keep all the cases which have a number of activities greater than or equal to the number of activities in LPM
+        filtered_log = pm4py.filter_log(lambda x: len(x) >= number_act_lpm, tracefilter_log_pos)
+        # remove cases with duplicate activities, we need to keep cases which has a unique number of activities greater
+        # than activities in LPM
+
+        for x in filtered_log:
+            uniques_events = []
+            for ev in x:
+                uniques_events.append(ev._dict['concept:name'])
+            if len(np.unique(uniques_events)) < number_act_lpm:
+                target_case = x[0]._dict['Case_duplicate']
+                filtered_log = attributes_filter.apply(filtered_log, [target_case],
+                                                       parameters={
+                                                           attributes_filter.Parameters.ATTRIBUTE_KEY: "Case_duplicate",
+                                                           attributes_filter.Parameters.POSITIVE: False})
+
+        print('start alignment checking')
+        aligned_traces = custom_alignment(net, im, fm, filtered_log)
+        Final_log = []
+        print('start creating lpm features')
+        print(len(aligned_traces))
+        for ii, aligned_trace in enumerate(aligned_traces):
+            # print(ii)
+            Case = log_converter.apply(filtered_log[ii], variant=log_converter.Variants.TO_DATA_FRAME)
+            Case[case_id] = filtered_log[ii].attributes['concept:name']
+            Case[lpm_col] = np.False_
+            aligned_acts = set()
             for jj, el in enumerate(aligned_trace["alignment"]):
                 if ">>" in el[1]:
-                    if None in el[1]:
-                        continue
-                    else:
-                        # if el[1][0] == ">>":
-                        #     # print('move on model')
-                        #     model_move_counter.add(ii)
-                        # else:
-                        idx_counter += 1
-                        continue
+                    continue
                 else:
-                    Case.at[idx_counter, lpm_col] = True
-                    idx_counter += 1
+                    aligned_acts.add(el[1][0])
 
-        Final_log.append(Case)
+            idx_counter = 0
+            if len(aligned_acts) >= number_act_lpm:
+                for jj, el in enumerate(aligned_trace["alignment"]):
+                    if ">>" in el[1]:
+                        if None in el[1]:
+                            continue
+                        else:
+                            # if el[1][0] == ">>":
+                            #     # print('move on model')
+                            #     model_move_counter.add(ii)
+                            # else:
+                            idx_counter += 1
+                            continue
+                    else:
+                        Case.at[idx_counter, lpm_col] = True
+                        idx_counter += 1
 
-    if len(Final_log) < 2:
-        continue
-    Tracefilter_LPMs_log = pd.concat(Final_log, axis=0)
-    Prefixes_dataframe[lpm_col] = np.False_
-    # All_Cases = Original_log_LPMs[case_id].unique()
-    LPMs_Cases = Tracefilter_LPMs_log[case_id].unique()
-    for case in LPMs_Cases:
-        # print(case)
-        True_cases = Tracefilter_LPMs_log[Tracefilter_LPMs_log[case_id] == case]
-        True_events = True_cases.loc[True_cases[lpm_col] == True]
-        for event_number in True_events[event_nr_col]:
-            target = int(Prefixes_dataframe.index[(Prefixes_dataframe[case_id] == case) &
-                                                  (Prefixes_dataframe[event_nr_col] == event_number)].values)
+            Final_log.append(Case)
 
-            Prefixes_dataframe.at[target, lpm_col] = True
+        if len(Final_log) < 2:
+            continue
+        Tracefilter_LPMs_log = pd.concat(Final_log, axis=0)
+        Prefixes_dataframe[lpm_col] = np.False_
+        # All_Cases = Original_log_LPMs[case_id].unique()
+        LPMs_Cases = Tracefilter_LPMs_log[case_id].unique()
+        for case in LPMs_Cases:
+            # print(case)
+            True_cases = Tracefilter_LPMs_log[Tracefilter_LPMs_log[case_id] == case]
+            True_events = True_cases.loc[True_cases[lpm_col] == True]
+            for event_number in True_events[event_nr_col]:
+                target = int(Prefixes_dataframe.index[(Prefixes_dataframe[case_id] == case) &
+                                                      (Prefixes_dataframe[event_nr_col] == event_number)].values)
 
-print(model_move_counter)
-print(time.time() - start)
-Prefixes_dataframe.to_csv(folder_address + "Discriminative/BPIC11_f1_Trunc36_Discriminative_LPMs.csv", index=False)
+                Prefixes_dataframe.at[target, lpm_col] = True
+
+    print(model_move_counter)
+    print(time.time() - start)
+    Prefixes_dataframe.to_csv(output_address_name_file, index=False)

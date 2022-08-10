@@ -1,26 +1,19 @@
 import pickle
-
 import numpy as np
-# For LSTM model
 import tensorflow as tf
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import LSTM
 from keras.layers import Dropout
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau
-# from keras import optimizers
 from tensorflow import keras
 from tqdm.keras import TqdmCallback
-from sklearn.model_selection import KFold, cross_val_score
-# For hyperopt (parameter optimization)
 from hyperopt import Trials, STATUS_OK, tpe, fmin, hp
 from hyperopt.pyll.base import scope  # quniform returns float, some parameters require int; use this to force int
 import os
 import config
 from feature_encoder import FeatureEncoder
-from LSTM_model import net
 import time
-from utils.processor_ver2 import LogsDataProcessor
 from utils.Writing_methods import write_results_to_text, evaluate_each_prefix, evaluate
 import pandas as pd
 
@@ -45,7 +38,6 @@ def f_lstm_cv(params):
         model.add(Dropout(rate=params['rate']))
 
     model.add(Dense(1, activation='sigmoid'))
-    # model.compile(optimizer='adam', loss='mean_squared_error')
     if params['opt'] == 'adam':
         opt = keras.optimizers.Adam(lr=params['learning_rate'])
     else:
@@ -99,6 +91,10 @@ with open(output_datasets_address + '/coded_activity.pkl', 'rb') as handle:
     coded_activity = pickle.load(handle)
 with open(output_datasets_address + '/coded_labels.pkl', 'rb') as handle:
     coded_labels = pickle.load(handle)
+
+with open(output_datasets_address + '/coded_lpms.pkl', 'rb') as handle:
+    coded_lpms = pickle.load(handle)
+
 with open(output_datasets_address + '/Max_prefix_length.pkl', 'rb') as handle:
     Max_prefix_length = pickle.load(handle)
 
@@ -106,18 +102,22 @@ Train_path = output_datasets_address + "/outcome_train.csv"
 train_df = pd.read_csv(filepath_or_buffer=Train_path, header=0, sep=',')
 print("Encoding training features ...")
 fe = FeatureEncoder()
-train_X, train_y = fe.one_hot_encoding(train_df, coded_activity, coded_labels, Max_prefix_length,
-                                       features=args.features, LPMs=args.LPMs,
-                                       Lpms_type=args.LPMs_type, Normalize=args.LPMs_Normal)
+if args.encoding_type == 'W':
+    train_X, train_y = fe.one_hot_encoding_Wrapped(train_df, coded_activity, coded_labels, Max_prefix_length,
+                                                   Lpms_type=args.LPMs_type)
+elif args.encoding_type == 'C':
+    train_X, train_y = fe.one_hot_encoding_Classic(train_df, coded_activity, coded_labels, coded_lpms,
+                                                   Max_prefix_length, LPMs=args.LPMs)
+else:
+    print("encoding type: %s is not supported! choose between C and W " % args.encoding_type)
 
 print("done")
 
 space = {'rate': hp.uniform('rate', 0.01, 0.3),
          'units': scope.int(hp.quniform('units', 10, 100, 5)),
-         # 'batch_size': scope.int(hp.quniform('batch_size', 32, 256, 8)),
          'batch_size': hp.choice('batch_size', [8, 16, 32, 64, 132]),
          'layers': scope.int(hp.quniform('layers', 1, 4, 1)),
-         'opt':  hp.choice('opt', ['adam', 'RMSprop']),
+         'opt': hp.choice('opt', ['adam', 'RMSprop']),
          'learning_rate': hp.uniform('learning_rate', 0.00001, 0.0001)
          }
 # model selection
@@ -148,16 +148,32 @@ outfile.close()
 print("Encoding test features...")
 Test_path = output_datasets_address + "/outcome_test.csv"
 test_df = pd.read_csv(filepath_or_buffer=Test_path, header=0, sep=',')
-fe_test = FeatureEncoder()
-test_X, test_y = fe_test.one_hot_encoding(test_df, coded_activity, coded_labels, Max_prefix_length,
-                                          features=args.features, LPMs=args.LPMs,
-                                          Lpms_type=args.LPMs_type, Normalize=args.LPMs_Normal)
+if args.encoding_type == 'W':
+    test_X, test_y = fe.one_hot_encoding_Wrapped(test_df, coded_activity, coded_labels, Max_prefix_length,
+                                                      Lpms_type=args.LPMs_type)
+elif args.encoding_type == 'C':
+    test_X, test_y = fe.one_hot_encoding_Classic(test_df, coded_activity, coded_labels, coded_lpms,
+                                                 Max_prefix_length, LPMs=args.LPMs)
+else:
+    print("encoding type: %s is not supported! choose between C and W " % args.encoding_type)
+
 print("done")
 # model.load(args.checkpoint_dir, model_name=model_name)
 print("Evaluating ...")
-CF_matrix, report, Accuracy, F1_Score, Precision, Recall, Cohen_kappa = evaluate(best_model, test_X, test_y)
-results_file = output_address + "Results_ConfMat_LSTM_%s.txt" % args.LPMs_type
+CF_matrix, report, Accuracy, F1_Score, Precision, Recall, Cohen_kappa, AUC = evaluate(best_model, test_X, test_y)
+results_file = output_address + "Results_ConfMat_LSTM_Encoding%s_LPMs%s_%s.txt" % (args.encoding_type,
+                                                                                   args.LPMs,
+                                                                                   args.LPMs_type)
 test_prefixes = test_df["k"]
-write_results_to_text(CF_matrix, report, Accuracy, F1_Score, Precision, Recall, best_time, Cohen_kappa, results_file)
-evaluate_each_prefix(best_model, test_X, test_y, test_prefixes, output_address, "results_prefixes_LSTM_%s" % args.LPMs_type)
+write_results_to_text(CF_matrix, report, Accuracy, F1_Score, Precision, Recall,
+                      best_time, Cohen_kappa, AUC, results_file)
+
+evaluate_each_prefix(best_model, test_X, test_y, test_prefixes, output_address,
+                     "results_prefixes_LSTM_Encoding%s_LPMs%s_%s" % (args.encoding_type,
+                                                                     args.LPMs,
+                                                                     args.LPMs_type))
+
+best_model.save(output_datasets_address + "/BestModel_Encoding%s_LPMs%s_%s" % (args.encoding_type,
+                                                                                   args.LPMs,
+                                                                                   args.LPMs_type))
 print("done")

@@ -2,14 +2,9 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics import f1_score, accuracy_score, recall_score, \
     precision_score, confusion_matrix, classification_report, cohen_kappa_score, roc_auc_score
-import tensorflow as tf
 
 
 def evaluate(model, x_test, y_test):
-    # calculate confusion matrix and weighted recall and precision
-    # model.compile(loss='binary_crossentropy', optimizer='adam',
-    #               metrics=[tf.keras.metrics.Precision(),
-    #                        tf.keras.metrics.Recall(), 'acc'])
     y_pred = model.predict(x_test)
 
     predictions = [int(np.round(a)) for a in y_pred]
