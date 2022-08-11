@@ -6,3 +6,8 @@ To use this repository, you need to discover Local Process Models using LPM mine
 
 # Datasets
 The labeled datasets to do experiments can be found at https://github.com/irhete/predictive-monitoring-benchmark 
+
+# Usage
+You first need to the following steps in order to generate LPMs feature from discovered LPMs. Then you can choose between On-hot encoding and Embedding method to encode generated features and learn the LSTM model.
+
+### LPM Feature Generation
