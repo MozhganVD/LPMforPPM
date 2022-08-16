@@ -8,6 +8,14 @@ To use this repository, you need to discover Local Process Models using LPM mine
 The labeled datasets to do experiments can be found at https://github.com/irhete/predictive-monitoring-benchmark 
 
 # Usage
-You first need to the following steps in order to generate LPMs feature from discovered LPMs. Then you can choose between On-hot encoding and Embedding method to encode generated features and learn the LSTM model.
 
 ### LPM Feature Generation
+1. Discover and save LPMs using ProM as .pnml format
+2. Save event logs in xes format 
+3. Run ```LPMDetection_Complete.py``` with following flags:
+    -  *--LPMs_dir*: path/to/discovered/LPMs
+    -  *--raw_log_file*: path/to/raw/eventlog/.xes
+    -  *--processed_log_file*: path/to/save/processed/eventlog/.csv
+    -  *--Min_prefix_size*
+    -  *--Max_prefix_size*
+4. Run ```LPMDetection_Complete.py```
