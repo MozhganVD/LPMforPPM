@@ -112,11 +112,7 @@ def wrap_lpm(net, im, fm):
     return net, im, final_marking
 
 
-parser = argparse.ArgumentParser(description="LPM Alignment Checking")
-parser.add_argument("--dataset",
-                    type=str,
-                    default="production_LPMs_HPopt",
-                    help="dataset name")
+parser = argparse.ArgumentParser(description="LPM Feature Generating")
 
 parser.add_argument("--LPMs_dir",
                     type=str,
@@ -125,7 +121,7 @@ parser.add_argument("--LPMs_dir",
 
 parser.add_argument("--raw_log_file",
                     type=str,
-                    default="./datasets/Production_Trunc23_completeLPMs_Aggregated.csv",
+                    default="./datasets/Production_Trunc23_completeLPMs_Aggregated.xes",
                     help="path to raw xes format log file")
 
 parser.add_argument("--processed_log_file",
@@ -258,4 +254,61 @@ if __name__ == '__main__':
 
     print(model_move_counter)
     print(time.time() - start)
-    Prefixes_dataframe.to_csv(output_address_name_file, index=False)
+    # Prefixes_dataframe.to_csv(output_address_name_file, index=False)
+
+### Integrating All Features in three form of binary, Frequency, and list
+
+    # Main_df = pd.read_csv(output_address_name_file, sep=',')
+    Prefixes_dataframe = Prefixes_dataframe.sort_values(by=["case:concept:name", "event_nr"])
+    LPMs_number_mention = False
+    keep_overlapped = False
+    num_events = len(Prefixes_dataframe)
+    All_LPMs = dict()
+
+    LPMs_file = glob.glob(LPMs_folder_name + "/*.pnml")
+    list_of_lpms = []
+    for net_file in LPMs_file:
+        lpm_number = os.path.basename(net_file).split(".")[0].split("_")[1]
+        list_of_lpms.append("LPM_%s" % lpm_number)
+
+    # list_of_lpms = ["LPM_"+str(i) for i in range(0, 42)]
+    exist_lpms = []
+    for l in list_of_lpms:
+        try:
+            All_LPMs[l] = np.array(Prefixes_dataframe[l])
+            exist_lpms.append(l)
+        except:
+            continue
+
+    lpms_list_name = []
+    for idx in range(num_events):
+        existed_lpms = "+"
+        for lpm in All_LPMs:
+            if All_LPMs[lpm][idx]:
+                existed_lpms += lpm + "+"
+        lpms_list_name.append(existed_lpms)
+
+    lpms_list_frequency = np.zeros(num_events)
+    for idx in range(num_events):
+        print(idx)
+        overlapped_number = 0
+        for lpm in All_LPMs:
+            if All_LPMs[lpm][idx]:
+                overlapped_number += 1
+
+        lpms_list_frequency[idx] = overlapped_number
+
+    lpms_list_binary = np.zeros(num_events)
+    for idx in range(num_events):
+        print(idx)
+        for lpm in All_LPMs:
+            if All_LPMs[lpm][idx]:
+                lpms_list_binary[idx] = 1
+                break
+
+    Prefixes_dataframe["LPMs_list"] = lpms_list_name
+    Prefixes_dataframe["LPMs_binary"] = lpms_list_binary
+    Prefixes_dataframe["LPMs_frequency"] = lpms_list_frequency
+    Prefixes_dataframe = Prefixes_dataframe.drop(columns=exist_lpms)
+
+    Prefixes_dataframe.to_csv(output_address_name_file, index=False, sep=";")
