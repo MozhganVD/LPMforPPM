@@ -22,25 +22,6 @@ parser.add_argument("--raw_log_file",
                     default="./datasets/Production_Trunc23_completeLPMs_Aggregated.csv",
                     help="path to raw csv log file")
 
-parser.add_argument("--task",
-                    type=str,
-                    default="outcome",
-                    help="task name")
-
-parser.add_argument("--sort_temporally",
-                    type=bool,
-                    default=False,
-                    help="sort cases by timestamp")
-
-parser.add_argument("--lpms",
-                    type=bool,
-                    default=True,
-                    help="training with patient features")
-
-parser.add_argument("--complete_lpms",
-                    type=bool,
-                    default=True)
-
 parser.add_argument('--Max_length', default=23, type=float)
 parser.add_argument('--train_ratio', default=0.80, type=float)
 
