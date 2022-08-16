@@ -21,7 +21,7 @@ The labeled datasets to do experiments can be found at https://github.com/irhete
 
 - Example:
 
-```LPMDetection_Complete.py --LPMs_dir "./LPMs" --raw_log_file "./datasets/eventlog.xes" --processed_log_file "./datasets/eventlog_processed.csv" --Min_prefix_size 2 --Max_prefix_size 36``` 
+```Python LPMDetection_Complete.py --LPMs_dir "./LPMs" --raw_log_file "./datasets/eventlog.xes" --processed_log_file "./datasets/eventlog_processed.csv" --Min_prefix_size 2 --Max_prefix_size 36``` 
 
 ### One-hot encoding (Classic/ Wrapped)
 1. Prepare dataset by running ```data_processing.py``` with following flags:
@@ -30,3 +30,71 @@ The labeled datasets to do experiments can be found at https://github.com/irhete
     -  *--raw_log_file*: path/to/processed/eventlog/.csv
     -  *--Max_length*
     -  *--train_ratio*
+
+- Example:
+
+```Python data_processing.py --dataset "Production" --dir_path "./datasets" --raw_log_file "./datasets/eventlog_processed.csv" --Max_length 36 --train_ratio 0.8``` 
+
+2. Hyperparameter tuning by running ```HP_Optimization.py``` with following flags:
+    -  *--dataset*: dataset name (same name as data processing name)
+    -  *--data_dir*: path/to/store/processed/data
+    -  *--checkpoint_dir*: path/to/sdave/results
+    -  *--LPMs*: True/False
+    -  *--encoding_type*: W: wrapped, C: classic one-hot
+    -  *--LPMs_type*: LPMs_binary/LPMs_frequency (if you choose the wrapped for encoding type)
+    
+- Example:
+
+```Python HP_Optimization.py --dataset "Production" --dir_path "./datasets" --checkpoint_dir "./checkpoints" --LPMs True --encoding_type "W" --LPMs_type "LPMs_binary"``` 
+
+3. Run LSTM model with a predifined parameters by running ```Main_LSTM_LPMs.py``` with following flags:
+    -  *--dataset*: dataset name (same name as data processing name)
+    -  *--data_dir*: path/to/store/processed/data
+    -  *--checkpoint_dir*: path/to/sdave/results
+    -  *--LPMs*: True/False
+    -  *--encoding_type*: W: wrapped, C: classic one-hot
+    -  *--LPMs_type*: LPMs_binary/LPMs_frequency (if you choose the wrapped for encoding type)
+    -  *--learning_rate*
+    -  *--batch_size*
+    -  *--layers*: number of LSTM layers
+    -  *--opt*: RMSprop or adam
+    -  *--rate*: dropout rate
+    -  *--units*: number of neuron units per layer
+    
+### Embedding layers 
+1. Hyperparameter tuning by running ```HPO_embedding_args.py``` with following flags:
+    -  *--data_dir*: path/to/save/results
+    -  *--raw_data*: path/to/processed/eventlog/.csv
+    -  *--out_name*: dataset name
+    -  *--LPMs*: True/False
+    -  *--Only_LPMs*: True/False (if you want to train model only with LPMs not activities, in this case both LPMs and Only_LPMs flags must be True.)
+    -  *--max_length*
+    -  *--results*: path/to/save/results/in/.text
+    
+ - Example:
+ 
+ ```Python HPO_embedding_args.py --data_dir "./datasets" --raw_data "./EventLog.csv" --out_name "production" --LPMs True --Only_LPMs False --max_length 36 --results "./results_lpms_act.txt"``` 
+ 
+2. Run LSTM model with a predifined parameters by running ```Embedding_Run.py``` with following flags:
+    -  *--data_dir*: path/to/save/results
+    -  *--raw_data*: path/to/processed/eventlog/.csv
+    -  *--out_name*: dataset name
+    -  *--LPMs*: True/False
+    -  *--Only_LPMs*: True/False (if you want to train model only with LPMs not activities, in this case both LPMs and Only_LPMs flags must be True.)
+    -  *--max_length*
+    -  *--results*: path/to/save/results/in/.text
+    -  *--batch_size*
+    -  *--embedding_act*: dimension of the embedding layers for activities 
+    -  *--embedding_lpms*: dimension of the embedding layers for LPMs
+    -  *--learning_rate*
+    -  *--opt*: RMSprop or adam
+    -  *--rate*: dropout rate
+    -  *--units*: number of neuron units per layer
+    -  *--layers*: number of LSTM layers
+    
+
+##Note
+- We assume the input csv file contains the columns named after the xes elements, e.g., concept:name
+- We assume the input event log contains a column named "event_nr" indicating the event orders for each case 
+
+    
