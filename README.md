@@ -9,7 +9,9 @@ The labeled datasets to do experiments can be found at https://github.com/irhete
 
 # Usage
 
-### LPM Feature Generation
+You first need to generate LPMs feature for each event log, then you can choose between one-hot encoding based methods or embedding layers to encode and train the LSTM model as described step by step below:
+
+## LPMs Feature Generation
 1. Discover and save LPMs using ProM as .pnml format
 2. Save event logs in xes format 
 3. Run ```LPMDetection_Complete.py``` with following flags:
@@ -23,7 +25,7 @@ The labeled datasets to do experiments can be found at https://github.com/irhete
 
 ```Python LPMDetection_Complete.py --LPMs_dir "./LPMs" --raw_log_file "./datasets/eventlog.xes" --processed_log_file "./datasets/eventlog_processed.csv" --Min_prefix_size 2 --Max_prefix_size 36``` 
 
-### One-hot encoding (Classic/ Wrapped)
+## One-hot encoding (Classic/ Wrapped)
 1. Prepare dataset by running ```data_processing.py``` with following flags:
     -  *--dataset*: dataset name
     -  *--dir_path*: path/to/store/processed/data
@@ -61,7 +63,7 @@ The labeled datasets to do experiments can be found at https://github.com/irhete
     -  *--rate*: dropout rate
     -  *--units*: number of neuron units per layer
     
-### Embedding layers 
+## Embedding layers 
 1. Hyperparameter tuning by running ```HPO_embedding_args.py``` with following flags:
     -  *--data_dir*: path/to/save/results
     -  *--raw_data*: path/to/processed/eventlog/.csv
