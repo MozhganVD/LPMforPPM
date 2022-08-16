@@ -18,4 +18,15 @@ The labeled datasets to do experiments can be found at https://github.com/irhete
     -  *--processed_log_file*: path/to/save/processed/eventlog/.csv
     -  *--Min_prefix_size*
     -  *--Max_prefix_size*
-4. Run ```LPMDetection_Complete.py```
+
+- Example:
+
+```LPMDetection_Complete.py --LPMs_dir "./LPMs" --raw_log_file "./datasets/eventlog.xes" --processed_log_file "./datasets/eventlog_processed.csv" --Min_prefix_size 2 --Max_prefix_size 36``` 
+
+### One-hot encoding (Classic/ Wrapped)
+1. Prepare dataset by running ```data_processing.py``` with following flags:
+    -  *--dataset*: dataset name
+    -  *--dir_path*: path/to/store/processed/data
+    -  *--raw_log_file*: path/to/processed/eventlog/.csv
+    -  *--Max_length*
+    -  *--train_ratio*
