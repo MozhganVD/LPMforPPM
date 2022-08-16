@@ -9,6 +9,10 @@ The labeled datasets to do experiments can be found at https://github.com/irhete
 
 # Usage
 
+- Install dependencies (Python 3.8.0) :
+
+```pip install -r requirements.txt```
+
 You first need to generate LPMs feature for each event log, then you can choose between one-hot encoding based methods or embedding layers to encode and train the LSTM model as described step by step below:
 
 ## LPMs Feature Generation
