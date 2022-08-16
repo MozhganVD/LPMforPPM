@@ -93,7 +93,7 @@ The labeled datasets to do experiments can be found at https://github.com/irhete
     -  *--layers*: number of LSTM layers
     
 
-##Note
+## Note
 - We assume the input csv file contains the columns named after the xes elements, e.g., concept:name
 - We assume the input event log contains a column named "event_nr" indicating the event orders for each case 
 
