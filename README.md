@@ -1,6 +1,6 @@
 # Encoding High-Level Control-Flow Construct Information for Process Outcome Prediction
 
-Supplementary material for the article *"Encoding High-Level Control-Flow Construct Information for Process Outcome Prediction" [[1]](#1). 
+Supplementary material for the article *"Encoding High-Level Control-Flow Construct Information for Process Outcome Prediction"* [[1]](#1). 
 
 This repository provides implementations for encoding high-level control-flow constructs information for outcome-oriented predictive process monitoring.
 To use this repository, you need to discover Local Process Models using LPM miner plugin available in ProM 6.9 and store discovered patterns as petri-nets in .pnml format.
